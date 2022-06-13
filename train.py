@@ -4,7 +4,7 @@ torch.cuda.empty_cache()
 from omegaconf import OmegaConf, DictConfig
 import torch.nn as nn
 import torch.optim as optim
-from torch import utils
+from torch import device, utils
 from torch.utils.data import dataset
 from torch.utils.data import DataLoader, Dataset
 import torch.nn.functional as F
@@ -65,7 +65,7 @@ def label_generator(data):
     labels = {'Crown_and_Root_Rot': 0, 'Healthy Wheat': 1, 'Leaf Rust': 2, 'Wheat Loose Smut': 3}
     for i in range(len(data)):
         data[i] = labels[data[i]]
-    return data
+    return torch.as_tensor(data)
 
 
 def train(config: DictConfig):
@@ -99,7 +99,7 @@ def train(config: DictConfig):
     else:
         model = torchvision.models.ResNet152(pretrained=config.pretrain)
 
-    # model.to(torch.device('cuda:0'))
+    model.to(torch.device('cuda:0'))
 
     criterion = nn.CrossEntropyLoss()
 
@@ -124,7 +124,7 @@ def train(config: DictConfig):
         if epoch % 5 == 0:
             checkpoint = {'epoch': epoch + 1, 'state_dict': model.state_dict(), 'optimizer': optimizer.state_dict()}
             print("Load True: saving checkpoint")
-            torch.save(model.state_dict(), Path(cwd, 'outputs\\cp'))
+            #torch.save(model.state_dict(), Path(cwd, 'outputs\\cp'))
         #
         # else:
         #     checkpoint = {'epoch': epoch + 1, 'state_dict': model.state_dict(),
@@ -132,19 +132,19 @@ def train(config: DictConfig):
         #     print("Loade False: saving checkpoint")
         #     save_checkpoint(checkpoint)
         for i, traindata in enumerate(trainloader):
-            images = traindata['image'].to(torch.LongTensor)
-            label = torch.LongTensor(label_generator(traindata['label']))
-            print(torch.LongTensor(label))
+            images = traindata['image'].to(device = 'cuda:0')
+            label = label_generator(traindata['label']).to(device = 'cuda:0')
+           # print(torch.LongTensor(label))
 
             # optim
             optimizer.zero_grad()
 
             # Forward propagation
-            outputs = model(images)
+            outputs = model(images.float())
             print(outputs)
             # _, predicted = torch.max(outputs, 1)
             #outputs = cross_entropy_loss(outputs)
-            loss = criterion(outputs, label)  # ....>
+            loss = criterion(outputs, label.float())  # ....>
 
             # Backward prop
             loss.backward()
@@ -178,48 +178,48 @@ def train(config: DictConfig):
 
         # Testing the model
 
-    #     with torch.no_grad():
-    #         correct = 0
-    #         total = 0
+        with torch.no_grad():
+            correct = 0
+            total = 0
+    
+            for testdata in testloader:
+                images = testdata['image'].to('cuda:0')
+                label = label_generator(testdata['label'])
+                labels = label.to(torch.float).to('cuda:0')
+                outputs = model(images.float())
+    
+                _, predicted = torch.max(outputs.data, 1)
+    
+                predlist = torch.cat([predlist, predicted.view(-1)])  # Append batch prediction results
+    
+                lbllist = torch.cat([lbllist, labels.view(-1)])
+    
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
+    
+                total_losss = loss.item()
+    
+                accuracy = correct / total
+    
+            print('Test Accuracy of the model: {} %'.format(100 * correct / total))
+    
+            logs['val_' + 'log loss'] = total_loss / total
+            validationloss = total_loss / total
+    
+            validationacc = ((correct / total) * 100)
+            logs['val_' + 'Accuracy'] = ((correct / total) * 100)
+    
+            # wandb.log({'test accuracy': validationacc, 'val loss': validationloss})
+    
+    # # Computing metrics:
     #
-    #         for testdata in testloader:
-    #             images = testdata['image'].to(torch.float).to('cuda:0')
-    #             label = label_generator(testdata['label'])
-    #             labels = label.to(torch.float).to('cuda:0')
-    #             outputs = model(images)
-    #
-    #             _, predicted = torch.max(outputs.data, 1)
-    #
-    #             predlist = torch.cat([predlist, predicted.view(-1)])  # Append batch prediction results
-    #
-    #             lbllist = torch.cat([lbllist, labels.view(-1)])
-    #
-    #             total += labels.size(0)
-    #             correct += (predicted == labels).sum().item()
-    #
-    #             total_losss = loss.item()
-    #
-    #             accuracy = correct / total
-    #
-    #         print('Test Accuracy of the model: {} %'.format(100 * correct / total))
-    #
-    #         logs['val_' + 'log loss'] = total_loss / total
-    #         validationloss = total_loss / total
-    #
-    #         validationacc = ((correct / total) * 100)
-    #         logs['val_' + 'Accuracy'] = ((correct / total) * 100)
-    #
-    #         # wandb.log({'test accuracy': validationacc, 'val loss': validationloss})
-    #
-    # # # Computing metrics:
-    # #
-    # conf_mat = confusion_matrix(lbllist.cpu().numpy(), predlist.cpu().numpy())
-    #
-    # print(conf_mat)
-    # cls = ["lower grade glioma (LGG)", "Glioblastoma (GBM/high grade glioma)", "Normal Brain"]
-    # # Per-class accuracy
-    # class_accuracy = 100 * conf_mat.diagonal() / conf_mat.sum(1)
-    # print(class_accuracy)
-    # plt.figure(figsize=(10, 10))
-    # plot_confusion_matrix(conf_mat, cls)
-    # plt.show()
+    conf_mat = confusion_matrix(lbllist.cpu().numpy(), predlist.cpu().numpy())
+    
+    print(conf_mat)
+    cls = ["lower grade glioma (LGG)", "Glioblastoma (GBM/high grade glioma)", "Normal Brain"]
+    # Per-class accuracy
+    class_accuracy = 100 * conf_mat.diagonal() / conf_mat.sum(1)
+    print(class_accuracy)
+    plt.figure(figsize=(10, 10))
+    plot_confusion_matrix(conf_mat, cls)
+    plt.show()

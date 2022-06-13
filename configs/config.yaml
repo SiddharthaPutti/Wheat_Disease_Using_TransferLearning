@@ -18,7 +18,7 @@ dataset:
 
 training:
   num_classes: 4
-  batch_size: 5
+  batch_size: 1
   learning_rate: 0.003
   num_epoch : 2
   num_workers : 5
