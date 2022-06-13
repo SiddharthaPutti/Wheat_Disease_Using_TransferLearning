@@ -1,0 +1,44 @@
+work_dir: ${hydra:runtime.cwd}
+data_dir: ${work_dir}/dataset/
+
+wandb_logger:
+  project: 'wheatDisease'
+  entity: 'Sidp'
+  group: 'vgg19'
+
+dataset_:
+  _target_: dataset.dataset.Datasets
+  dataset_path: ${work_dir}\dataset
+
+global_seed: 341
+
+dataset:
+  img_scale_factor: 0.7
+  train_test_split_seed: 55
+
+training:
+  num_classes: 4
+  batch_size: 5
+  learning_rate: 0.003
+  num_epoch : 2
+  num_workers : 5
+  dropout: 0.2
+  weight_decay: 0.001
+
+pretrain: True
+
+models:
+  model: 'vgg19'
+# model: 'Xception'
+# model: 'InceptionV3'
+# model: 'ResNet152'
+
+vgg19:
+  _target_: models.vgg19.vgg19Pretrained
+resnet_mixed_convStem:
+  _target_: stems.resnet_mixed_conv.modifybasicstem
+conv3dStem:
+  _target_: stems.3dconv.modifybasicstem
+
+
+load_model: False
