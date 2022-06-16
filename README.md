@@ -4,4 +4,4 @@ initial commit:- errors with vgg19 implementation, in vgg19 model fc are changed
 <br>
 second commit- no errors recorded, but failed to allocate memory from CUDA: error type **CUDA error: CUBLAS_STATUS_NOT_INITIALIZED when calling `cublasCreate(handle)`**
 <br>
-third commit: CUDA: memory allocation error. perfectly running on CPU. accuracy doesnt seem promising which means changes required in architecture. 
+third commit: CUDA: memory allocation error. perfectly running on CPU. accuracy doesnt seem promising which means changes required in architecture. **This perticular update is performed on jpg and png files only.**
