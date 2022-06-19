@@ -1,3 +1,4 @@
+from turtle import forward
 import hydra
 import torch
 torch.cuda.empty_cache()
@@ -70,6 +71,16 @@ def collate(batch):
     batch = filter(lambda img: img is not None, batch)
     return data.default_collate(list(batch))
 
+
+class net(nn.Module):
+    def __init__(self) -> None:
+        super(net, self).__init__()
+        self.softmax = nn.Softmax(dim=1)
+
+    def forward(self,x):
+        X  = self.softmax(x)
+        return X
+
 def train(config: DictConfig):
     # wandb.init(project=config.wandb_logger.project, entity=config.wandb_logger.entity, group=config.wandb_logger.group)
 
@@ -80,6 +91,8 @@ def train(config: DictConfig):
 
     torch.manual_seed(config.global_seed)
     # load_model = config.load_model
+
+   
 
 
 
@@ -93,6 +106,8 @@ def train(config: DictConfig):
         model.classifier[3] = nn.Linear(in_features=4096, out_features=512)
         model.classifier[5] = nn.Dropout(config.training.dropout)
         model.classifier[6] = nn.Linear(in_features=512, out_features=config.training.num_classes)
+        net_add =  net()
+        model = nn.Sequential(model, net_add)
         print(model)
 
     elif config.models.model == 'Xception':
@@ -111,8 +126,8 @@ def train(config: DictConfig):
                                  weight_decay=config.training.weight_decay)
 
     # Initialize the prediction and label lists(tensors) for confusion matrix
-    predlist = torch.zeros(0, dtype=torch.float32)#.to(torch.device('cuda:0'))
-    lbllist = torch.zeros(0, dtype=torch.float32)#.to(torch.device('cuda:0'))
+    predlist = torch.zeros(0, dtype=torch.float32).to(torch.device('cuda:0'))
+    lbllist = torch.zeros(0, dtype=torch.float32).to(torch.device('cuda:0'))
 
     # if load_model:
     #     the_model = torch.load(Path(cwd, 'outputs'))
@@ -147,7 +162,8 @@ def train(config: DictConfig):
 
             # Forward propagation
             outputs = model(images.float())
-            #print(outputs)
+            # print(outputs)
+            # print(label)
             # _, predicted = torch.max(outputs, 1)
             #outputs = cross_entropy_loss(outputs)
             loss = criterion(outputs, label)  # ....>
@@ -184,36 +200,35 @@ def train(config: DictConfig):
 
         # Testing the model
 
-    #     with torch.no_grad():
-    #         correct = 0
-    #         total = 0
+        with torch.no_grad():
+            correct = 0
+            total = 0
     
-    #         for testdata in testloader:
-    #             images = testdata['image']#.to('cuda:0')
-    #             label = label_generator(testdata['label'])
-    #             labels = label.to(torch.float)#.to('cuda:0')
-    #             outputs = model(images.float())
+            for testdata in testloader:
+                images = testdata['image'].to('cuda:0')
+                label = label_generator(testdata['label']).to(device = 'cuda:0')
+                outputs = model(images.float())
     
-    #             _, predicted = torch.max(outputs.data, 1)
+                _, predicted = torch.max(outputs.data, 1)
     
-    #             predlist = torch.cat([predlist, predicted.view(-1)])  # Append batch prediction results
+                predlist = torch.cat([predlist, predicted.view(-1)])  # Append batch prediction results
     
-    #             lbllist = torch.cat([lbllist, labels.view(-1)])
+                lbllist = torch.cat([lbllist, label.view(-1)])
     
-    #             total += labels.size(0)
-    #             correct += (predicted == labels).sum().item()
+                total += label.size(0)
+                correct += (predicted == label).sum().item()
     
-    #             total_losss = loss.item()
+                total_losss = loss.item()
     
-    #             accuracy = correct / total
+                accuracy = correct / total
     
-    #         print('Test Accuracy of the model: {} %'.format(100 * correct / total))
+            print('Test Accuracy of the model: {} %'.format(100 * correct / total))
     
-    #         logs['val_' + 'log loss'] = total_loss / total
-    #         validationloss = total_loss / total
+            # logs['val_' + 'log loss'] = total_loss / total
+            # validationloss = total_loss / total
     
-    #         validationacc = ((correct / total) * 100)
-    #         logs['val_' + 'Accuracy'] = ((correct / total) * 100)
+            # validationacc = ((correct / total) * 100)
+            # logs['val_' + 'Accuracy'] = ((correct / total) * 100)
     
     #         # wandb.log({'test accuracy': validationacc, 'val loss': validationloss})
     
